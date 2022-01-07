@@ -1,3 +1,4 @@
+import numpy as np
 import rlgym
 from rlgym.gym import Gym
 from rlgym.utils.obs_builders import AdvancedObs
@@ -22,7 +23,7 @@ def train():
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
 
-    env = rlgym.make(game_speed=1, spawn_opponents=True,
+    env = rlgym.make(game_speed=5, spawn_opponents=True,
                      terminal_conditions=[common_conditions.TimeoutCondition(seconds)],
                      reward_fn=AlignBallGoal(),
                      obs_builder=AdvancedObs())
@@ -33,16 +34,26 @@ def train():
     agent.set_model(BaseModel(input_shape, action_shape))
 
     for episode in range(agent.episode_number):
-        obs = env.reset()
+        obs = env.reset(True)[0]
         done = False
+
+        total_reward = 0
 
         while not done:
             # Here we sample a random action. If you have an agent, you would get an action from it here.
-            action = [1, 0, 1, 0, 0, 0, 0, 0]
+            action = agent.get_next_action()
 
-            next_obs, reward, done, gameinfo = env.step(action)
+            old_state = np.copy(obs)
 
-            obs = next_obs
+            obs, reward, done, gameinfo = env.step(action)
+
+            total_reward += reward
+
+            agent.add_record(old_state, obs, action, reward, done)
+
+            agent.after_action()
+            if done:
+                print(f"Episode {episode} finished with score {gameinfo}")
 
 
 def main():
