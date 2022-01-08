@@ -50,14 +50,9 @@ class AgentBase:
         self.n_index = (self.n_index + 1) % self.record_size
         self.num_in_buffer = min(self.record_size, self.num_in_buffer)
 
-    def get_next_action(self):
-        probability = np.random.rand()
+    def get_next_action(self, state):
+        pass
 
-        if probability < self.epsilon:
-            return self.environment.action_space.sample()
-
-        # TODO : Update return value
-        return [0, 0, 0, 0, 0, 0, 0, 0]
 
     def decrease_epsilon(self):
         if self.epsilon > self.min_epsilon:

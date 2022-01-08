@@ -23,15 +23,12 @@ def train():
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
 
-    env = rlgym.make(game_speed=5, spawn_opponents=True,
-                     terminal_conditions=[common_conditions.TimeoutCondition(seconds)],
+    env = rlgym.make(game_speed=20, spawn_opponents=True,
+                     terminal_conditions=[common_conditions.TimeoutCondition(seconds), common_conditions.GoalScoredCondition()],
                      reward_fn=AlignBallGoal(),
                      obs_builder=AdvancedObs())
 
-    input_shape, action_shape = get_info(env)
-
     agent = ActorCritic(env)
-    agent.set_model(BaseModel(input_shape, action_shape))
 
     for episode in range(agent.episode_number):
         obs = env.reset(True)[0]
@@ -41,13 +38,14 @@ def train():
 
         while not done:
             # Here we sample a random action. If you have an agent, you would get an action from it here.
-            action = agent.get_next_action()
+            action = agent.get_action(obs)
 
             old_state = np.copy(obs)
 
             obs, reward, done, gameinfo = env.step(action)
 
             total_reward += reward
+            print(reward)
 
             agent.add_record(old_state, obs, action, reward, done)
 
