@@ -3,9 +3,14 @@ import rlgym
 from rlgym.gym import Gym
 from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.terminal_conditions import common_conditions
-from rlgym.utils.reward_functions.common_rewards import AlignBallGoal
+from rlgym.utils.reward_functions.common_rewards import AlignBallGoal, VelocityBallToGoalReward, \
+    LiuDistancePlayerToBallReward
+
+from rlgym_tools.extra_rewards.multiply_rewards import MultiplyRewards
+
 from Agents.ActorCritic import ActorCritic
 from Models.BaseModel import BaseModel
+from Rewards.KickoffReward import KickoffReward
 
 
 def get_info(env: Gym):
@@ -23,9 +28,9 @@ def train():
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
 
-    env = rlgym.make(game_speed=20, spawn_opponents=True,
+    env = rlgym.make(game_speed=50, spawn_opponents=True,
                      terminal_conditions=[common_conditions.TimeoutCondition(seconds), common_conditions.GoalScoredCondition()],
-                     reward_fn=AlignBallGoal(),
+                     reward_fn=MultiplyRewards(VelocityBallToGoalReward(),LiuDistancePlayerToBallReward()),
                      obs_builder=AdvancedObs())
 
     agent = ActorCritic(env)
@@ -45,11 +50,43 @@ def train():
             obs, reward, done, gameinfo = env.step(action)
 
             total_reward += reward
-            print(reward)
 
             agent.add_record(old_state, obs, action, reward, done)
 
             agent.after_action()
+            if done:
+                print(f"Episode {episode} finished with score {total_reward}")
+                print(f"Epsilon for {episode} : {agent.epsilon}")
+
+        if episode % 50 == 0:
+            agent.serialize(episode)
+
+
+def test(model_name):
+    default_tick_skip = 8
+    physics_ticks_per_second = 120
+    ep_len_seconds = 300
+
+    seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
+
+    env = rlgym.make(game_speed=2, spawn_opponents=True,
+                     terminal_conditions=[common_conditions.TimeoutCondition(seconds),
+                                          common_conditions.GoalScoredCondition()],
+                     obs_builder=AdvancedObs())
+
+    agent = ActorCritic(env)
+    agent.load_info(model_name)
+    agent.epsilon = 0.01
+
+    for episode in range(100):
+        obs = env.reset(True)[0]
+        done = False
+
+        while not done:
+            action = agent.get_action(obs)
+
+            obs, reward, done, gameinfo = env.step(action)
+
             if done:
                 print(f"Episode {episode} finished with score {gameinfo}")
 

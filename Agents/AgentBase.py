@@ -13,7 +13,7 @@ class AgentBase:
         self.epsilon = 1
         self.min_epsilon = 0.01
         self.max_epsilon = 1
-        self.epsilon_decay = 0.9999
+        self.epsilon_decay = 0.999995
 
         self.batch_size = 64
         self.learning_rate = 0.001
