@@ -48,7 +48,7 @@ class AgentBase:
         self.done[self.n_index] = done
 
         self.n_index = (self.n_index + 1) % self.record_size
-        self.num_in_buffer = min(self.record_size, self.num_in_buffer)
+        self.num_in_buffer = min(self.record_size, self.n_index)
 
     def get_next_action(self, state):
         pass

@@ -1,11 +1,12 @@
 import numpy as np
 import tensorflow
+import tensorflow.keras.backend as K
 from rlgym.gym import Gym
 from tensorflow.keras import Input, optimizers
+from tensorflow.python.keras.layers import Dense, Lambda, Dropout
 from tensorflow.python.keras.models import Model
-import tensorflow.keras.backend as K
+
 from Agents.AgentBase import AgentBase
-from tensorflow.python.keras.layers import Dense, InputLayer, Lambda, Dropout
 
 tensorflow.compat.v1.disable_eager_execution()
 
@@ -25,33 +26,35 @@ class ActorCritic(AgentBase):
 
     def training(self):
         chosen_records = self.sample()
-        current = [self.current_states[index] for index in chosen_records]
+        current = np.array([np.array(self.current_states[index]) for index in chosen_records])
         new = [self.new_states[index] for index in chosen_records]
         actions = [self.actions[index] for index in chosen_records]
         rewards = [self.rewards[index] for index in chosen_records]
         done = [self.rewards[index] for index in chosen_records]
 
-        discounted_rewards = self.discount_rewards(rewards, current)
-
         states = np.asarray(current, dtype='float32')
-        rewards = np.asarray(rewards, dtype='float32')
-        values = self.critic.predict(states)
+        discounted_rewards, values = self.discount_rewards(rewards, states)
+
+        rewards = np.asarray([np.array([reward] * self.environment.action_space.shape[0]) for reward in rewards],
+                             dtype='float32')
 
         advantages = rewards - values
+        advantages = np.asarray(advantages, dtype='float32')
+        actions = np.asarray(actions, dtype='float32')
+        self.optimizers[0]([states, advantages, actions])
+        self.optimizers[1]([states, discounted_rewards])
 
-        self.optimizers[0]([current, actions, advantages])
-        self.optimizers[1]([current, discounted_rewards])
-
-    def discount_rewards(self, rewards, states, done=True):
-        discounted_rewards = np.zeros_like(rewards)
+    def discount_rewards(self, rewards, states, done=False):
+        discounted_rewards = np.zeros((len(rewards), self.environment.action_space.shape[0]))
         running_add = 0
         if not done:
+            states = np.asarray(states)
             running_add = \
-                self.critic.predict(np.reshape(states[-1], (1, self.environment.observation_space.shape)))[0]
+                self.critic.predict(states)
+
         for t in reversed(range(0, len(rewards))):
-            running_add = running_add * self.gamma + rewards[t]
-            discounted_rewards[t] = running_add
-        return discounted_rewards
+            discounted_rewards[t] = running_add[t] + self.gamma * rewards[t]
+        return discounted_rewards, running_add
 
     def get_action(self, state):
         probability = np.random.rand()
@@ -70,7 +73,7 @@ class ActorCritic(AgentBase):
         state = Input(batch_shape=(None, self.environment.observation_space.shape[0]))
         dropout_input = Dropout(0.2)(state)
         actor_input = Dense(128, activation='relu')(dropout_input)
-        dropout_hidden = Dropout(0.25)(actor_input)
+        dropout_hidden = Dropout(0.4)(actor_input)
         actor_hidden = Dense(64, activation='relu')(dropout_hidden)
         dropout_hidden = Dropout(0.3)(actor_hidden)
         actor_hidden = Dense(32, activation='relu')(dropout_hidden)
@@ -78,18 +81,16 @@ class ActorCritic(AgentBase):
         mu_0 = Dense(self.environment.action_space.shape[0], activation='tanh')(dropout_hidden)
         sigma_0 = Dense(self.environment.action_space.shape[0], activation='softplus')(dropout_hidden)
 
-        mu = Lambda(lambda x: x )(mu_0)
+        mu = Lambda(lambda x: x)(mu_0)
         sigma = Lambda(lambda x: x + 0.0001)(sigma_0)
 
-        critic_input = Dense(128, input_dim=self.environment.observation_space.shape[0], activation='relu')(state)
-        value_hidden = Dense(64, activation='relu', kernel_initializer='he_uniform')(critic_input)
+        critic_input = Dense(64, input_dim=self.environment.observation_space.shape[0], activation='relu')(state)
+        value_hidden = Dense(32, activation='relu', kernel_initializer='he_uniform')(critic_input)
         state_value = Dense(8, activation='linear', kernel_initializer='he_uniform')(value_hidden)
 
         actor = Model(inputs=state, outputs=(mu, sigma))
         critic = Model(inputs=state, outputs=state_value)
 
-        # actor._make_predict_function()
-        # critic._make_predict_function()
         actor.compile(optimizer=optimizers.Adam(learning_rate=0.0001),
                       loss='mse',
                       metrics=['accuracy'])
@@ -98,15 +99,12 @@ class ActorCritic(AgentBase):
                        loss='mse',
                        metrics=['accuracy'])
 
-        actor.summary()
-        critic.summary()
-
         return actor, critic
 
     def actor_optimizer(self):
 
-        action = K.placeholder(shape=(None, 1))
-        advantages = K.placeholder(shape=(None, 1))
+        action = K.placeholder(shape=(self.batch_size, 8), dtype='float32', name='actionPlaceholder')
+        advantages = K.placeholder(shape=(self.batch_size, 8), dtype='float32', name='advantagesPlaceholder')
 
         mu, sigma_sq = self.actor.output
 
@@ -122,13 +120,13 @@ class ActorCritic(AgentBase):
         optimizer = optimizers.Adam(learning_rate=0.0001)
         updates = optimizer.get_updates(params=self.actor.trainable_weights, loss=actor_loss)
 
-        train = K.function(self.actor.input, action, updates=updates)
+        train = K.function([self.actor.input, advantages, action], [self.actor.output], updates=updates)
         return train
 
         # make loss function for Value approximation
 
     def critic_optimizer(self):
-        discounted_reward = K.placeholder(shape=(None, 1))
+        discounted_reward = K.placeholder(shape=(self.batch_size, 8))
 
         value = self.critic.output
 
@@ -136,7 +134,7 @@ class ActorCritic(AgentBase):
 
         optimizer = optimizers.Adam(learning_rate=0.001)
         updates = optimizer.get_updates(params=self.critic.trainable_weights, loss=loss)
-        train = K.function(self.critic.input, discounted_reward, updates=updates)
+        train = K.function([self.critic.input, discounted_reward], [self.critic.output], updates=updates)
         return train
 
     def serialize(self, episode):

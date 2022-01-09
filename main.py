@@ -5,13 +5,15 @@ from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.terminal_conditions import common_conditions
 from rlgym.utils.reward_functions.common_rewards import AlignBallGoal, VelocityBallToGoalReward, \
     LiuDistancePlayerToBallReward, RewardIfTouchedLast
-
 from rlgym_tools.extra_rewards.multiply_rewards import MultiplyRewards
 
 from Agents.ActorCritic import ActorCritic
-from Models.BaseModel import BaseModel
-from Rewards.KickoffReward import KickoffReward
 
+import tensorflow as tf
+config = tf.compat.v1.ConfigProto(
+        device_count = {'GPU': 0}
+    )
+sess = tf.compat.v1.Session(config=config)
 
 def get_info(env: Gym):
     input_size = env.observation_space.shape
@@ -23,14 +25,14 @@ def get_info(env: Gym):
 
 def train():
     default_tick_skip = 8
-    physics_ticks_per_second = 60
+    physics_ticks_per_second = 30
     ep_len_seconds = 300
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
 
-    env = rlgym.make(game_speed=100, spawn_opponents=True,
+    env = rlgym.make(game_speed=50, spawn_opponents=True,
                      terminal_conditions=[common_conditions.TimeoutCondition(seconds), common_conditions.GoalScoredCondition()],
-                     reward_fn=MultiplyRewards(VelocityBallToGoalReward(),LiuDistancePlayerToBallReward()),
+                     reward_fn=MultiplyRewards(LiuDistancePlayerToBallReward(), AlignBallGoal()),
                      obs_builder=AdvancedObs())
 
     agent = ActorCritic(env)
@@ -97,7 +99,7 @@ def test(model_name):
 
 def main():
     train()
-    # test("350")
+    # test("1250")
 
 
 if __name__ == "__main__":
