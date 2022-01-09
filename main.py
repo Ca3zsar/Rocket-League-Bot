@@ -4,7 +4,7 @@ from rlgym.gym import Gym
 from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.terminal_conditions import common_conditions
 from rlgym.utils.reward_functions.common_rewards import AlignBallGoal, VelocityBallToGoalReward, \
-    LiuDistancePlayerToBallReward
+    LiuDistancePlayerToBallReward, RewardIfTouchedLast
 
 from rlgym_tools.extra_rewards.multiply_rewards import MultiplyRewards
 
@@ -23,12 +23,12 @@ def get_info(env: Gym):
 
 def train():
     default_tick_skip = 8
-    physics_ticks_per_second = 120
+    physics_ticks_per_second = 60
     ep_len_seconds = 300
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
 
-    env = rlgym.make(game_speed=50, spawn_opponents=True,
+    env = rlgym.make(game_speed=100, spawn_opponents=True,
                      terminal_conditions=[common_conditions.TimeoutCondition(seconds), common_conditions.GoalScoredCondition()],
                      reward_fn=MultiplyRewards(VelocityBallToGoalReward(),LiuDistancePlayerToBallReward()),
                      obs_builder=AdvancedObs())
@@ -64,7 +64,7 @@ def train():
 
 def test(model_name):
     default_tick_skip = 8
-    physics_ticks_per_second = 120
+    physics_ticks_per_second = 60
     ep_len_seconds = 300
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
@@ -83,7 +83,11 @@ def test(model_name):
         done = False
 
         while not done:
-            action = agent.get_action(obs)
+            action = agent.get_action(obs).flatten()
+            print(action)
+            action[2] = 0.0
+            action[3] = 0.0
+            action[4] = 0.0
 
             obs, reward, done, gameinfo = env.step(action)
 
@@ -93,6 +97,7 @@ def test(model_name):
 
 def main():
     train()
+    # test("350")
 
 
 if __name__ == "__main__":

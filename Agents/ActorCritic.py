@@ -61,8 +61,7 @@ class ActorCritic(AgentBase):
 
         mu, sigma_sq = self.actor.predict(np.reshape(state, [1, self.environment.observation_space.shape[0]]))
 
-        epsilon = np.random.randn(self.environment.action_space.shape[0])
-        action = mu + np.sqrt(sigma_sq) * epsilon
+        action = mu + np.sqrt(sigma_sq)
         action = np.clip(action, -1, 1)
         return action
 
@@ -71,7 +70,7 @@ class ActorCritic(AgentBase):
         state = Input(batch_shape=(None, self.environment.observation_space.shape[0]))
         dropout_input = Dropout(0.2)(state)
         actor_input = Dense(128, activation='relu')(dropout_input)
-        dropout_hidden = Dropout(0.4)(actor_input)
+        dropout_hidden = Dropout(0.25)(actor_input)
         actor_hidden = Dense(64, activation='relu')(dropout_hidden)
         dropout_hidden = Dropout(0.3)(actor_hidden)
         actor_hidden = Dense(32, activation='relu')(dropout_hidden)
@@ -79,7 +78,7 @@ class ActorCritic(AgentBase):
         mu_0 = Dense(self.environment.action_space.shape[0], activation='tanh')(dropout_hidden)
         sigma_0 = Dense(self.environment.action_space.shape[0], activation='softplus')(dropout_hidden)
 
-        mu = Lambda(lambda x: x * 2)(mu_0)
+        mu = Lambda(lambda x: x )(mu_0)
         sigma = Lambda(lambda x: x + 0.0001)(sigma_0)
 
         critic_input = Dense(128, input_dim=self.environment.observation_space.shape[0], activation='relu')(state)
