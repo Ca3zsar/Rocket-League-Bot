@@ -47,15 +47,19 @@ def train():
     model = BaseModel(state_shape, 8)
     agent.set_model(model)
 
+
     for episode in range(agent.episode_number):
         obs = env.reset(True)[0]
         done = False
 
         total_reward = 0
 
+        action = 0
+
         while not done:
             # Here we sample a random action. If you have an agent, you would get an action from it here.
-            action = agent.get_next_action(obs)
+            if agent.frames % 4 == 0:
+                action = agent.get_next_action(obs)
 
             old_state = np.copy(obs)
 
