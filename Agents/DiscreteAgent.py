@@ -31,7 +31,7 @@ class DiscreteAgent(AgentBase):
 
     def after_action(self):
         self.decrease_epsilon()
-
+        self.frames += 1
         if self.frames % 8 == 0 and self.num_in_buffer > 2*self.batch_size:
             self.training()
 
@@ -49,7 +49,7 @@ class DiscreteAgent(AgentBase):
         outputs = self.__get_outputs(current, actions, rewards, new, done)
 
         # i'm not sure it here it should be epochs=1
-        self.online_model.model.fit(current, outputs, epochs=1, verbose=0)
+        self.online_model.model.fit(current, outputs, epochs=1, verbose=0, callbacks=None, use_multiprocessing=True)
 
 
     def __get_outputs(self, states, actions, rewards, new_states, done):
