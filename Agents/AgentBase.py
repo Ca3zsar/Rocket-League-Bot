@@ -6,7 +6,6 @@ from rlgym.gym import Gym
 
 from Models import BaseModel
 
-
 class AgentBase:
     def __init__(self, env: Gym):
         self.gamma = 0.95
@@ -24,7 +23,7 @@ class AgentBase:
         self.episode_number = 5000
         self.current_states = np.empty((self.record_size,) + env.observation_space.shape)
         self.new_states = np.empty((self.record_size,) + env.observation_space.shape)
-        self.actions = np.empty((self.record_size,) + env.action_space.shape)
+        self.actions = np.empty((self.record_size,))
         self.rewards = np.empty((self.record_size,))
         self.done = np.empty((self.record_size,))
 
@@ -64,17 +63,17 @@ class AgentBase:
     # take 64 different action
     def sample(self):
 
-        return np.random.choice(self.num_in_buffer, self.batch_size, replace=False)
+        return np.random.choice(self.num_in_buffer, self.batch_size*2, replace=False)
 
     def training(self):
         pass
 
     def update_target(self):
-        self.target_model.set_weights(self.online_model.get_weights())
+        self.target_model.model.set_weights(self.online_model.model.get_weights())
 
     def load_info(self, episode):
-        self.online_model = tensorflow.keras.models.load_model(f"saved_models\\{episode}-online")
-        self.target_model = tensorflow.keras.models.load_model(f"saved_models\\{episode}-target")
+        self.online_model.model = tensorflow.keras.models.load_model(f"saved_models\\{episode}-online")
+        self.target_model.model = tensorflow.keras.models.load_model(f"saved_models\\{episode}-target")
 
         with open(f"records\\episode_records_{episode}", "rb") as file:
             self.records = pickle.load(file)
@@ -85,11 +84,11 @@ class AgentBase:
             self.frames = int(info[1])
 
     def serialize(self, episode):
-        self.online_model.save(f'saved_models\\{episode}-online')
-        self.target_model.save(f'saved_models\\{episode}-target')
+        self.online_model.model.save(f'saved_models\\{episode}-online')
+        self.target_model.model.save(f'saved_models\\{episode}-target')
 
-        with open(f"records\\episode_records_{episode}", "wb") as file:
-            pickle.dump(self.records, file, 0)
-
-        with open(f"configs\\episode_config_{episode}.txt", "w") as file:
-            file.write(f"{self.epsilon} {self.frames}")
+        # with open(f"records\\episode_records_{episode}", "wb") as file:
+        #     pickle.dump(self.records, file, 0)
+        #
+        # with open(f"configs\\episode_config_{episode}.txt", "w") as file:
+        #     file.write(f"{self.epsilon} {self.frames}")

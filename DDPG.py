@@ -3,7 +3,8 @@ import rlgym
 import tensorflow as tf
 import tensorflow.keras.initializers
 from rlgym.utils.obs_builders import AdvancedObs
-from rlgym.utils.reward_functions.common_rewards import TouchBallReward
+from rlgym_tools.extra_obs.general_stacking import GeneralStacker
+from rlgym.utils.reward_functions.common_rewards import TouchBallReward, VelocityBallToGoalReward, RewardIfTouchedLast
 from rlgym.utils.terminal_conditions import common_conditions
 from tensorflow.keras import layers
 
@@ -16,7 +17,7 @@ env = rlgym.make(game_speed=50, spawn_opponents=True,
                  terminal_conditions=[common_conditions.TimeoutCondition(seconds),
                                       common_conditions.GoalScoredCondition()],
                  reward_fn=TouchBallReward(),
-                 obs_builder=AdvancedObs())
+                 obs_builder=GeneralStacker(AdvancedObs()))
 
 num_states = env.observation_space.shape[0]
 num_actions = env.action_space.shape[0]
@@ -135,11 +136,9 @@ def update_target(target_weights, weights, tau):
 
 def get_actor():
     inputs = layers.Input(shape=(num_states,))
-    out = layers.Dense(128, activation="relu", kernel_initializer=tensorflow.keras.initializers.Orthogonal())(inputs)
-    hidden = layers.Dropout(0.2)(out)
-    out = layers.Dense(256, activation="relu", kernel_initializer=tensorflow.keras.initializers.HeUniform())(hidden)
-    hidden = layers.Dropout(0.3)(out)
-    outputs = layers.Dense(num_actions, activation="tanh")(hidden)
+    out = layers.Dense(64, activation="tanh", kernel_initializer=tensorflow.keras.initializers.Orthogonal())(inputs)
+    out = layers.Dense(128, activation="relu", kernel_initializer=tensorflow.keras.initializers.HeUniform())(out)
+    outputs = layers.Dense(num_actions, activation="tanh")(out)
 
     model = tf.keras.Model(inputs, outputs)
     return model
@@ -148,21 +147,20 @@ def get_actor():
 def get_critic():
     # State as input
     state_input = layers.Input(shape=(num_states,))
-    state_out = layers.Dense(128, activation="relu", kernel_initializer=tensorflow.keras.initializers.Orthogonal())(
+    state_out = layers.Dense(64, activation="tanh", kernel_initializer=tensorflow.keras.initializers.Orthogonal())(
         state_input)
-    state_out = layers.Dense(256, activation="relu")(state_out)
+    state_out = layers.Dense(128, activation="relu")(state_out)
 
     # Action as input
     action_input = layers.Input(shape=(num_actions,))
-    action_out = layers.Dense(32, activation="relu", kernel_initializer=tensorflow.keras.initializers.Orthogonal())(action_input)
+    action_out = layers.Dense(32, activation="relu", kernel_initializer=tensorflow.keras.initializers.HeUniform())(action_input)
 
     concat = layers.Concatenate()([state_out, action_out])
 
     out = layers.Dense(128, activation="relu")(concat)
     hidden = layers.Dropout(0.2)(out)
     out = layers.Dense(256, activation="relu")(hidden)
-    hidden = layers.Dropout(0.2)(out)
-    outputs = layers.Dense(num_actions)(hidden)
+    outputs = layers.Dense(num_actions)(out)
 
     # Outputs single value for give state-action
     model = tf.keras.Model([state_input, action_input], outputs)
@@ -178,11 +176,12 @@ def policy(state, noise_object):
 
     # We make sure action is within bounds
     legal_action = np.clip(sampled_actions, lower_bound, upper_bound)
-    return [np.squeeze(legal_action)]
+    print(f"Action : {legal_action}")
+    return legal_action
 
 
 std_dev = 0.1
-ou_noise = OUActionNoise(mean=np.zeros(1), std_deviation=float(std_dev) * np.ones(num_actions))
+ou_noise = OUActionNoise(mean=np.zeros(8), std_deviation=std_dev)
 
 actor_model = get_actor()
 critic_model = get_critic()
@@ -195,11 +194,11 @@ target_actor.set_weights(actor_model.get_weights())
 target_critic.set_weights(critic_model.get_weights())
 
 # Learning rate for actor-critic models
-critic_lr = 0.9
-actor_lr = 0.95
+critic_lr = 0.001
+actor_lr = 0.005
 
-critic_optimizer = tf.keras.optimizers.Adam(critic_lr, clipnorm=0.75)
-actor_optimizer = tf.keras.optimizers.Adam(actor_lr, clipnorm=0.75)
+critic_optimizer = tf.keras.optimizers.Adam(critic_lr, clipnorm=5)
+actor_optimizer = tf.keras.optimizers.Adam(actor_lr, clipnorm=5)
 
 total_episodes = 10000
 # Discount factor for future rewards
@@ -218,7 +217,6 @@ update_steps = 10000
 epsilon = 1
 eps_decay = 0.99999
 
-# Takes about 4 min to train
 frames = 0
 for ep in range(total_episodes):
 
@@ -229,6 +227,7 @@ for ep in range(total_episodes):
 
     while True:
         frames += 1
+
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
         if frames % 4 == 0:
@@ -237,15 +236,15 @@ for ep in range(total_episodes):
                 action = env.action_space.sample()
             else:
                 action = policy(tf_prev_state, ou_noise)
+            # print(action)
 
-        # Recieve state and reward from environment.
+        # Receieve state and reward from environment.
+        action[7] = 0
         state, reward, done, info = env.step(action)
-
         if reward == 0:
-            reward = -0.25
-        else:
-            reward = 50
+            reward = -0.05
 
+        state = np.clip(state,-1,1)
         buffer.record((prev_state, action, reward, state))
         episodic_reward += reward
 

@@ -3,21 +3,28 @@ import rlgym
 from rlgym.gym import Gym
 from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.terminal_conditions import common_conditions
-from rlgym.utils.reward_functions.common_rewards import AlignBallGoal, VelocityBallToGoalReward, \
-    LiuDistancePlayerToBallReward, RewardIfTouchedLast
-from rlgym_tools.extra_rewards.multiply_rewards import MultiplyRewards
+from rlgym.utils.reward_functions.common_rewards import TouchBallReward
 
-from Agents.ActorCritic import ActorCritic
+import os
+import logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+logging.getLogger('tensorflow').disabled = True
 
 import tensorflow as tf
-config = tf.compat.v1.ConfigProto(
-        device_count = {'GPU': 0}
-    )
-sess = tf.compat.v1.Session(config=config)
+tf.get_logger().setLevel(3)
+
+from Agents.DiscreteAgent import DiscreteAgent, ACTIONS
+from Models.BaseModel import BaseModel
+
+# config = tf.compat.v1.ConfigProto(
+#     device_count={'GPU': 0}
+# )
+# sess = tf.compat.v1.Session(config=config)
+tf.compat.v1.disable_eager_execution()
+
 
 def get_info(env: Gym):
     input_size = env.observation_space.shape
-    print(input_size)
     action_number = env.action_space.shape
 
     return input_size[0], action_number[0]
@@ -25,17 +32,20 @@ def get_info(env: Gym):
 
 def train():
     default_tick_skip = 8
-    physics_ticks_per_second = 30
+    physics_ticks_per_second = 60
     ep_len_seconds = 300
 
     seconds = int(round(ep_len_seconds * physics_ticks_per_second / default_tick_skip))
 
     env = rlgym.make(game_speed=50, spawn_opponents=True,
-                     terminal_conditions=[common_conditions.TimeoutCondition(seconds), common_conditions.GoalScoredCondition()],
-                     reward_fn=MultiplyRewards(LiuDistancePlayerToBallReward(), AlignBallGoal()),
+                     terminal_conditions=[common_conditions.TimeoutCondition(seconds),
+                                          common_conditions.GoalScoredCondition()],
+                     reward_fn=TouchBallReward(),
                      obs_builder=AdvancedObs())
-
-    agent = ActorCritic(env)
+    state_shape, _ = get_info(env)
+    agent = DiscreteAgent(env)
+    model = BaseModel(state_shape, 8)
+    agent.set_model(model)
 
     for episode in range(agent.episode_number):
         obs = env.reset(True)[0]
@@ -45,11 +55,11 @@ def train():
 
         while not done:
             # Here we sample a random action. If you have an agent, you would get an action from it here.
-            action = agent.get_action(obs)
+            action = agent.get_next_action(obs)
 
             old_state = np.copy(obs)
 
-            obs, reward, done, gameinfo = env.step(action)
+            obs, reward, done, gameinfo = env.step(ACTIONS[action])
 
             total_reward += reward
 
@@ -76,7 +86,7 @@ def test(model_name):
                                           common_conditions.GoalScoredCondition()],
                      obs_builder=AdvancedObs())
 
-    agent = ActorCritic(env)
+    agent = DiscreteAgent(env)
     agent.load_info(model_name)
     agent.epsilon = 0.01
 
