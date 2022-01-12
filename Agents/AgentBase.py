@@ -4,23 +4,24 @@ import numpy as np
 import tensorflow.keras.models
 from rlgym.gym import Gym
 
-from Models import BaseModel
+from Models.BaseModel import BaseModel
+
 
 class AgentBase:
     def __init__(self, env: Gym):
         self.gamma = 0.95
         self.epsilon = 1
-        self.min_epsilon = 0.01
+        self.min_epsilon = 0.025
         self.max_epsilon = 1
         self.epsilon_decay = 0.999995
 
         self.batch_size = 64
         self.learning_rate = 0.001
-        self.record_size = 10000
+        self.record_size = 20000
         self.n_index = 0
         self.num_in_buffer = 0
 
-        self.episode_number = 5000
+        self.episode_number = 10000
         self.current_states = np.empty((self.record_size,) + env.observation_space.shape)
         self.new_states = np.empty((self.record_size,) + env.observation_space.shape)
         self.actions = np.empty((self.record_size,))
@@ -72,16 +73,19 @@ class AgentBase:
         self.target_model.model.set_weights(self.online_model.model.get_weights())
 
     def load_info(self, episode):
+        self.online_model = BaseModel(1, 1)
+        self.target_model = BaseModel(1,1)
+
         self.online_model.model = tensorflow.keras.models.load_model(f"saved_models\\{episode}-online")
         self.target_model.model = tensorflow.keras.models.load_model(f"saved_models\\{episode}-target")
 
-        with open(f"records\\episode_records_{episode}", "rb") as file:
-            self.records = pickle.load(file)
-
-        with open(f"configs\\episode_config_{episode}.txt") as file:
-            info = file.read().split()
-            self.epsilon = float(info[0])
-            self.frames = int(info[1])
+        # with open(f"records\\episode_records_{episode}", "rb") as file:
+        #     self.records = pickle.load(file)
+        #
+        # with open(f"configs\\episode_config_{episode}.txt") as file:
+        #     info = file.read().split()
+        #     self.epsilon = float(info[0])
+        #     self.frames = int(info[1])
 
     def serialize(self, episode):
         self.online_model.model.save(f'saved_models\\{episode}-online')

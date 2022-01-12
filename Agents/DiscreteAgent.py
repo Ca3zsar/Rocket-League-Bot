@@ -7,15 +7,21 @@ from Agents.AgentBase import AgentBase
 
 ACTIONS = [
     np.array([1, 0, 0, 0, 0, 0, 0, 0]),
+    np.array([0.75, 0, 0, 0, 0, 0, 0, 0]),
     np.array([1, 1, 0, 0, 0, 0, 0, 0]),
+    np.array([1, 0.75, 0, 0, 0, 0, 0, 0]),
     np.array([1, -1, 0, 0, 0, 0, 0, 0]),
+    np.array([1, -0.75, 0, 0, 0, 0, 0, 0]),
     np.array([-1, 0, 0, 0, 0, 0, 0, 0]),
+    np.array([-0.75, 0, 0, 0, 0, 0, 0, 0]),
     np.array([-1, 1, 0, 0, 0, 0, 0, 0]),
     np.array([-1, -1, 0, 0, 0, 0, 0, 0]),
     np.array([0, 0, 0, 0, 0, 1, 0, 0]),
     np.array([0, 0, 0, 0, 0, 0, 1, 0])
 ]
 
+actions_taken = dict.fromkeys([str(i) for i in range(len(ACTIONS))], 0)
+print(actions_taken)
 class DiscreteAgent(AgentBase):
     def __init__(self, env: Gym):
         super().__init__(env)
@@ -24,15 +30,16 @@ class DiscreteAgent(AgentBase):
         probability = np.random.rand()
 
         if probability < self.epsilon:
-            return random.randint(0, 7)
+            return random.randint(0, len(ACTIONS) - 1)
 
-        new_state = np.reshape(state, (1, 107))
-        return np.argmax(self.online_model.model.predict(new_state))
+        new_state = np.reshape(state, (1, state.shape[0]))
+        preds = self.online_model.model.predict(new_state)
+        return np.argmax(preds)
 
     def after_action(self):
         self.decrease_epsilon()
         self.frames += 1
-        if self.frames % 8 == 0 and self.num_in_buffer > 2*self.batch_size:
+        if self.frames % 8 == 0 and self.num_in_buffer > 2 * self.batch_size:
             self.training()
 
         if self.frames % self.update_target_steps == 0:
@@ -49,8 +56,8 @@ class DiscreteAgent(AgentBase):
         outputs = self.__get_outputs(current, actions, rewards, new, done)
 
         # i'm not sure it here it should be epochs=1
-        self.online_model.model.fit(current, outputs, epochs=1, verbose=0, callbacks=None, use_multiprocessing=True)
-
+        self.online_model.model.fit(current, outputs, batch_size=16, epochs=2, verbose=0, callbacks=None,
+                                    use_multiprocessing=True)
 
     def __get_outputs(self, states, actions, rewards, new_states, done):
         new_states_reshaped = np.array(new_states)
