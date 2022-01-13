@@ -4,7 +4,7 @@ from rlgym.gym import Gym
 from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.terminal_conditions import common_conditions
 from rlgym.utils.reward_functions.common_rewards import TouchBallReward, LiuDistancePlayerToBallReward, \
-    LiuDistanceBallToGoalReward, AlignBallGoal, RewardIfTouchedLast
+    LiuDistanceBallToGoalReward, AlignBallGoal, RewardIfTouchedLast, VelocityPlayerToBallReward
 
 import os
 import logging
@@ -16,6 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logging.getLogger('tensorflow').disabled = True
 
 import tensorflow as tf
+
 tf.get_logger().setLevel(3)
 
 from Agents.DiscreteAgent import DiscreteAgent, ACTIONS, actions_taken
@@ -45,8 +46,8 @@ def train():
     env = rlgym.make(game_speed=100, spawn_opponents=True,
                      terminal_conditions=[common_conditions.TimeoutCondition(seconds),
                                           common_conditions.GoalScoredCondition()],
-                     reward_fn=AnnealRewards(TouchBallReward(), 500_000,
-                                             RewardIfTouchedLast(LiuDistanceBallToGoalReward()), 750_000,
+                     reward_fn=AnnealRewards(TouchBallReward(), 600_000,
+                                             LiuDistanceBallToGoalReward(), 750_000,
                                              AlignBallGoal()),
                      obs_builder=AdvancedStacker(stack_size=8))
     state_shape, _ = get_info(env)
@@ -55,27 +56,25 @@ def train():
     agent.set_model(model)
 
     shots = 0
-
+    frames = 0
     for episode in range(agent.episode_number):
         obs = env.reset(True)[0] + 5
         done = False
 
         total_reward = 0
-
         action = 0
 
         while not done:
-            # Here we sample a random action. If you have an agent, you would get an action from it here.
-            if agent.frames % 4 == 0:
-                action = agent.get_next_action(obs)
-                actions_taken[str(action)] += 1
+            action = agent.get_next_action(obs)
+            actions_taken[str(action)] += 1
 
             old_state = np.copy(obs)
 
             obs, reward, done, gameinfo = env.step(ACTIONS[action])
+            obs += 5
             if gameinfo['result'] == -1:
                 reward = -50
-            elif gameinfo['result'] == 1 and gameinfo['result'].players[0].ball_touched:
+            elif gameinfo['result'] == 1 and gameinfo['state'].players[0].ball_touched:
                 reward = 100
             elif gameinfo['state'].players[0].match_shots >= shots:
                 shots += 1
@@ -87,7 +86,8 @@ def train():
 
             agent.after_action()
             if done:
-                print(f"Episode {episode} finished with score {total_reward}")
+                print(f"Episode {episode} finished with score {total_reward} . Frames : {agent.frames-frames}")
+                frames = agent.frames
                 print(f"Epsilon for {episode} : {agent.epsilon}")
                 print(actions_taken)
 
@@ -95,6 +95,7 @@ def train():
             agent.serialize(episode)
 
     agent.serialize(agent.episode_number)
+
 
 def test(model_name):
     default_tick_skip = 8
@@ -117,7 +118,7 @@ def test(model_name):
         done = False
 
         while not done:
-            action = agent.get_next_action(obs)
+            action = agent.get_next_action(obs, 0)
             print(action)
 
             obs, reward, done, gameinfo = env.step(ACTIONS[action])

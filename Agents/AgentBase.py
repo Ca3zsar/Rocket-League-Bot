@@ -28,7 +28,7 @@ class AgentBase:
         self.rewards = np.empty((self.record_size,))
         self.done = np.empty((self.record_size,))
 
-        self.update_target_steps = 10000
+        self.update_target_steps = 20000
 
         self.online_model: BaseModel = None
         self.target_model: BaseModel = None
@@ -50,7 +50,7 @@ class AgentBase:
         self.n_index = (self.n_index + 1) % self.record_size
         self.num_in_buffer = min(self.record_size, self.n_index)
 
-    def get_next_action(self, state):
+    def get_next_action(self, state, legal_actions):
         pass
 
 

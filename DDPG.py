@@ -35,7 +35,6 @@ class OUActionNoise:
         self.reset()
 
     def __call__(self):
-        # Formula taken from https://www.wikipedia.org/wiki/Ornstein-Uhlenbeck_process.
         x = (
                 self.x_prev
                 + self.theta * (self.mean - self.x_prev) * self.dt
@@ -82,9 +81,6 @@ class Buffer:
 
         self.buffer_counter += 1
 
-    # Eager execution is turned on by default in TensorFlow 2. Decorating with tf.function allows
-    # TensorFlow to build a static graph out of the logic and computations in our function.
-    # This provides a large speed up for blocks of code that contain many small TensorFlow operations such as this one.
     @tf.function
     def update(
             self, state_batch, action_batch, reward_batch, next_state_batch,

@@ -7,17 +7,13 @@ from Agents.AgentBase import AgentBase
 
 ACTIONS = [
     np.array([1, 0, 0, 0, 0, 0, 0, 0]),
-    np.array([0.75, 0, 0, 0, 0, 0, 0, 0]),
     np.array([1, 1, 0, 0, 0, 0, 0, 0]),
-    np.array([1, 0.75, 0, 0, 0, 0, 0, 0]),
     np.array([1, -1, 0, 0, 0, 0, 0, 0]),
-    np.array([1, -0.75, 0, 0, 0, 0, 0, 0]),
     np.array([-1, 0, 0, 0, 0, 0, 0, 0]),
-    np.array([-0.75, 0, 0, 0, 0, 0, 0, 0]),
     np.array([-1, 1, 0, 0, 0, 0, 0, 0]),
     np.array([-1, -1, 0, 0, 0, 0, 0, 0]),
-    np.array([0, 0, 0, 0, 0, 1, 0, 0]),
-    np.array([0, 0, 0, 0, 0, 0, 1, 0])
+    np.array([1, 0, 0, 0, 0, 1, 0, 0]),
+    np.array([1, 0, 0, 0, 0, 0, 1, 0])
 ]
 
 actions_taken = dict.fromkeys([str(i) for i in range(len(ACTIONS))], 0)
@@ -55,7 +51,6 @@ class DiscreteAgent(AgentBase):
 
         outputs = self.__get_outputs(current, actions, rewards, new, done)
 
-        # i'm not sure it here it should be epochs=1
         self.online_model.model.fit(current, outputs, batch_size=16, epochs=2, verbose=0, callbacks=None,
                                     use_multiprocessing=True)
 
@@ -68,7 +63,7 @@ class DiscreteAgent(AgentBase):
 
         for index, action in enumerate(actions):
             if not done[index]:
-                predictions[index, int(action)] = rewards[index] + self.gamma * max_qs[index]
+                predictions[index, int(action)] = rewards[index] + self.learning_rate* (self.gamma * np.max(predictions[index]) - max_qs[index])
             else:
                 predictions[index, int(action)] = rewards[index]
 
