@@ -107,7 +107,10 @@ def test(model_name):
     env = rlgym.make(game_speed=2, spawn_opponents=True,
                      terminal_conditions=[common_conditions.TimeoutCondition(seconds),
                                           common_conditions.GoalScoredCondition()],
-                     obs_builder=AdvancedObs())
+                     reward_fn=AnnealRewards(TouchBallReward(), 600_000,
+                                             LiuDistanceBallToGoalReward(), 750_000,
+                                             AlignBallGoal()),
+                     obs_builder=AdvancedStacker(stack_size=8))
 
     agent = DiscreteAgent(env)
     agent.load_info(model_name)
@@ -118,7 +121,7 @@ def test(model_name):
         done = False
 
         while not done:
-            action = agent.get_next_action(obs, 0)
+            action = agent.get_next_action(obs)
             print(action)
 
             obs, reward, done, gameinfo = env.step(ACTIONS[action])
@@ -128,8 +131,8 @@ def test(model_name):
 
 
 def main():
-    train()
-    # test("4950")
+    # train()
+    test("3900")
 
 
 if __name__ == "__main__":

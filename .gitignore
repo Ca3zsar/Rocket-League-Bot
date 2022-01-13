@@ -1,5 +1,5 @@
 configs/
-saved_models/
+saved_models/*
 .idea/misc.xml
 .idea/modules.xml
 .idea/inspectionProfiles/profiles_settings.xml
@@ -7,3 +7,5 @@ saved_models/
 .idea/vcs.xml
 .idea/workspace.xml
 *.pyc
+!*saved_models/3900-online
+!*saved_models/3900-target
